@@ -18,6 +18,7 @@ export default function OperationDetailPage() {
   const [pax, setPax] = useState<Pax[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [status, setStatus] = useState<Operation['status']>('planned');
+  const [sendingHeartbeat, setSendingHeartbeat] = useState(false);
   const socket = useSocket();
 
   useEffect(() => {
@@ -70,6 +71,37 @@ export default function OperationDetailPage() {
     refresh();
   };
 
+  const sendHeartbeat = async () => {
+    if (!driver?.token || vehicles.length === 0 || !operation) return;
+    const vessel = vehicles[0];
+
+    const base =
+      vessel.lastPing?.location ||
+      operation.stops[0]?.location || { lat: 40.75, lng: -73.99 };
+
+    // Nudge the marker a bit for visual movement.
+    const nextLat = base.lat + (Math.random() - 0.5) * 0.01;
+    const nextLng = base.lng + (Math.random() - 0.5) * 0.01;
+
+    setSendingHeartbeat(true);
+    try {
+      const updated = await apiFetch<Vehicle>(`/api/vehicles/${vessel._id}/heartbeat`, {
+        method: 'POST',
+        token: driver.token,
+        body: JSON.stringify({
+          location: { lat: nextLat, lng: nextLng },
+          speed: Math.floor(15 + Math.random() * 20)
+        })
+      });
+      setVehicles((prev) => {
+        const others = prev.filter((v) => v._id !== updated._id);
+        return [...others, updated];
+      });
+    } finally {
+      setSendingHeartbeat(false);
+    }
+  };
+
   const checkedInCount = useMemo(() => pax.filter((p) => p.checkedIn).length, [pax]);
 
   if (isLoading || !operation) {
@@ -103,6 +135,14 @@ export default function OperationDetailPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <button className="btn" onClick={startOperation} disabled={!guide?.token || status === 'active'}>
             Start operation
+          </button>
+          <button
+            className="btn secondary"
+            onClick={sendHeartbeat}
+            disabled={!driver?.token || vehicles.length === 0 || sendingHeartbeat}
+            title={driver?.token ? 'Simulate driver ping' : 'Driver auto-login still loading'}
+          >
+            {sendingHeartbeat ? 'Pinging…' : 'Send heartbeat'}
           </button>
           {authLoading && <span className="muted">Signing in guide/driver…</span>}
           {authError && <span className="muted">Auth error: {authError}</span>}
