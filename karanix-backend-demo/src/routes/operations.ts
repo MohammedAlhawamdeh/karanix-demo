@@ -12,16 +12,17 @@ export const operationsRouter = Router();
 
 operationsRouter.get(
   '/',
+  authenticate(),
   validate(
     Joi.object({
       date: Joi.string().isoDate().optional(),
-      status: Joi.string().valid('planned', 'active', 'completed').optional()
+      status: Joi.string().valid('planned', 'active', 'completed', 'cancelled').optional()
     }),
     'query'
   ),
   getOperationsHandler
 );
 
-operationsRouter.get('/:id', getOperationHandler);
+operationsRouter.get('/:id', authenticate(), getOperationHandler);
 
 operationsRouter.post('/:id/start', authenticate(['guide', 'driver']), startOperationHandler);

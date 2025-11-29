@@ -24,13 +24,20 @@ export const listOperations = async (filters: { date?: string; status?: Operatio
   return Operation.find(query)
     .populate('pax')
     .populate('vehicles')
+    .populate('guideId')
+    .populate('driverId')
     .sort({ date: 1 })
     .exec();
 };
 
 export const getOperation = async (id: string): Promise<IOperation> => {
   if (!isValidObjectId(id)) throw badRequest('Invalid operation id');
-  const op = await Operation.findById(id).populate('pax').populate('vehicles').exec();
+  const op = await Operation.findById(id)
+    .populate('pax')
+    .populate('vehicles')
+    .populate('guideId')
+    .populate('driverId')
+    .exec();
   if (!op) throw notFound('Operation not found');
   return op;
 };
@@ -40,4 +47,21 @@ export const startOperation = async (id: string): Promise<IOperation> => {
   op.status = 'active';
   await op.save();
   return op;
+};
+
+export const setOperationCheckInCounts = async (
+  operationId: string | undefined,
+  totalPax: number,
+  checkedInCount: number
+) => {
+  if (!operationId || !isValidObjectId(operationId)) return;
+  await Operation.findByIdAndUpdate(operationId, {
+    totalPax,
+    checkedInCount
+  }).exec();
+};
+
+export const markWarningSent = async (operationId: string) => {
+  if (!isValidObjectId(operationId)) return;
+  await Operation.findByIdAndUpdate(operationId, { lastWarningSentAt: new Date() }).exec();
 };

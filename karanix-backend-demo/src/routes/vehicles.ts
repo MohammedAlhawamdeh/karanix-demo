@@ -14,8 +14,16 @@ vehiclesRouter.post(
       location: Joi.object({
         lat: Joi.number().required(),
         lng: Joi.number().required()
-      }).required(),
-      speed: Joi.number().optional()
+      }).optional(),
+      lat: Joi.number().optional(),
+      lng: Joi.number().optional(),
+      speed: Joi.number().optional(),
+      heading: Joi.number().optional(),
+      timestamp: Joi.date().iso().optional()
+    }).custom((value, helpers) => {
+      if (value.location) return value;
+      if (typeof value.lat === 'number' && typeof value.lng === 'number') return value;
+      return helpers.error('any.invalid');
     })
   ),
   heartbeatHandler

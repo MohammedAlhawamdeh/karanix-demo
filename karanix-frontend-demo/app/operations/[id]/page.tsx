@@ -18,6 +18,7 @@ export default function OperationDetailPage() {
   const [pax, setPax] = useState<Pax[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [status, setStatus] = useState<Operation['status']>('planned');
+  const [warning, setWarning] = useState<string | null>(null);
   const [sendingHeartbeat, setSendingHeartbeat] = useState(false);
   const socket = useSocket();
 
@@ -26,6 +27,7 @@ export default function OperationDetailPage() {
       setPax(operation.pax || []);
       setVehicles(operation.vehicles || []);
       setStatus(operation.status);
+      setWarning(null);
     }
   }, [operation]);
 
@@ -40,7 +42,7 @@ export default function OperationDetailPage() {
       });
     };
 
-    const handleManifest = (payload: { pax: Pax }) => {
+    const handleManifest = (payload: { pax: Pax; checkedInCount?: number }) => {
       setPax((prev) => {
         const others = prev.filter((p) => p._id !== payload.pax._id);
         return [...others, payload.pax];
@@ -48,16 +50,19 @@ export default function OperationDetailPage() {
     };
 
     const handleStart = () => setStatus('active');
+    const handleWarning = (payload: { message: string }) => setWarning(payload.message);
 
-    socket.on('vehicle:update', handleVehicle);
-    socket.on('manifest:update', handleManifest);
+    socket.on('operation:vehicle_position', handleVehicle);
+    socket.on('operation:manifest_update', handleManifest);
     socket.on('operation:start', handleStart);
+    socket.on('operation:warning', handleWarning);
 
     return () => {
       socket.emit('leaveOperation', id);
-      socket.off('vehicle:update', handleVehicle);
-      socket.off('manifest:update', handleManifest);
+      socket.off('operation:vehicle_position', handleVehicle);
+      socket.off('operation:manifest_update', handleManifest);
       socket.off('operation:start', handleStart);
+      socket.off('operation:warning', handleWarning);
     };
   }, [socket, id]);
 
@@ -82,6 +87,7 @@ export default function OperationDetailPage() {
     // Nudge the marker a bit for visual movement.
     const nextLat = base.lat + (Math.random() - 0.5) * 0.01;
     const nextLng = base.lng + (Math.random() - 0.5) * 0.01;
+    const nextHeading = Math.floor(Math.random() * 360);
 
     setSendingHeartbeat(true);
     try {
@@ -89,8 +95,11 @@ export default function OperationDetailPage() {
         method: 'POST',
         token: driver.token,
         body: JSON.stringify({
-          location: { lat: nextLat, lng: nextLng },
-          speed: Math.floor(15 + Math.random() * 20)
+          lat: nextLat,
+          lng: nextLng,
+          speed: Math.floor(15 + Math.random() * 20),
+          heading: nextHeading,
+          timestamp: new Date().toISOString()
         })
       });
       setVehicles((prev) => {
@@ -118,10 +127,12 @@ export default function OperationDetailPage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <div className="pill" style={{ background: 'rgba(34,211,238,0.1)', color: '#22d3ee' }}>
-              Operation
+              {operation.code}
             </div>
             <h1 style={{ marginTop: 6 }}>{operation.title}</h1>
+            <div className="muted">{operation.tourName}</div>
             <div className="muted">{format(new Date(operation.date), 'PPPP')}</div>
+            <div className="muted">Start time: {format(new Date(operation.startTime), 'p')}</div>
           </div>
           <div style={{ textAlign: 'right' }}>
             <div className="pill" style={{ background: 'rgba(251,191,36,0.16)', color: '#fbbf24' }}>
@@ -131,9 +142,15 @@ export default function OperationDetailPage() {
               {checkedInCount}/{pax.length} checked-in
             </div>
           </div>
-        </div>
+      </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <button className="btn" onClick={startOperation} disabled={!guide?.token || status === 'active'}>
+          <button
+            className="btn"
+            onClick={startOperation}
+            disabled={
+              !guide?.token || status === 'active' || status === 'completed' || status === 'cancelled'
+            }
+          >
             Start operation
           </button>
           <button
@@ -147,6 +164,11 @@ export default function OperationDetailPage() {
           {authLoading && <span className="muted">Signing in guide/driver…</span>}
           {authError && <span className="muted">Auth error: {authError}</span>}
         </div>
+        {warning && (
+          <div style={{ marginTop: 4, color: '#ef4444', fontWeight: 600 }}>
+            Warning: {warning}
+          </div>
+        )}
         {operation.notes && (
           <div className="muted" style={{ marginTop: 4 }}>
             {operation.notes}
@@ -190,7 +212,7 @@ export default function OperationDetailPage() {
         </div>
       </div>
 
-      <MapView operation={operation} vehicles={vehicles} />
+      <MapView operation={operation} vehicles={vehicles} pax={pax} />
     </main>
   );
 }

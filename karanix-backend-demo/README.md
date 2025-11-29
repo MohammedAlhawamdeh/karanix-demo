@@ -24,7 +24,7 @@ npm run dev            # starts on http://localhost:4000
 `npm run seed` resets collections and loads:
 - Guide user: `guide@example.com` / `guide123`
 - Driver user: `driver@example.com` / `driver123`
-- Two operations (today/tomorrow), vehicles with starting pings, and pax manifests.
+- Two operations (today/tomorrow) with codes, start times, routes, vehicles with starting pings, pax manifests (with pickup points and seats), plus demo customers/locations.
 
 ## API contract
 
@@ -34,31 +34,48 @@ Base URL: `http://localhost:4000`
   - Body: `{ "email": string, "password": string }`
   - Response: `{ token, user: { id, name, email, role } }`
 
-- `GET /api/operations?date=YYYY-MM-DD&status=planned|active|completed`
-  - Lists operations for a date and optional status. Returns populated pax + vehicles.
+- `GET /api/operations?date=YYYY-MM-DD&status=planned|active|completed|cancelled`
+  - JWT required. Lists operations for a date and optional status. Returns populated pax + vehicles and counts.
 - `GET /api/operations/:id`
-  - Operation detail with pax, vehicles, stops.
+  - JWT required. Operation detail with pax, vehicles, stops, route.
 - `POST /api/operations/:id/start` (roles: guide|driver)
   - Marks status `active`; emits `operation:start`.
 
 - `POST /api/pax/:id/checkin` (role: guide)
-  - Marks pax as checked-in; emits `manifest:update`.
+  - Body:
+    ```json
+    {
+      "method": "qr" | "manual",
+      "gps": { "lat": number, "lng": number },
+      "photoUrl": "optional",
+      "eventId": "uuid"
+    }
+    ```
+  - Idempotent on `eventId`. Marks pax as checked-in, updates `operations.checkedInCount`, logs a check-in event, emits `operation:manifest_update`.
 
 - `POST /api/vehicles/:id/heartbeat` (role: driver)
-  - Body: `{ location: { lat, lng }, speed? }`
-  - Updates `lastPing` + history; emits `vehicle:update`.
+  - Body: `{ lat, lng, speed?, heading?, timestamp? }` (or `{ location: { lat, lng }, ... }`)
+  - Updates `lastPing` + history; emits `operation:vehicle_position` and `vehicle:position`.
+
+- `GET /api/customers` / `POST /api/customers` (JWT)
+  - Create customers and optionally attach to a location.
+- `GET /api/locations` / `POST /api/locations`
+  - Create locations with coordinates and attach customers (`POST /api/locations/:id/customers`).
 
 Common errors: `401` missing/invalid token, `403` role mismatch, `400/404` invalid ids.
 
 ## WebSocket events (Socket.IO)
 
-Namespace: default. Join a room per operation id: `operation:<id>`.
+Namespace: default. Join a room per operation id: `operation:<id>` (and optional `vehicle:<id>`).
 
 - `joinOperation` / `leaveOperation` with payload `<operationId>` to manage rooms.
+- `joinVehicle` / `leaveVehicle` for per-vehicle rooms.
 - Server emits:
-  - `vehicle:update`: `{ operationId, vehicle }`
-  - `manifest:update`: `{ operationId, pax }`
+  - `operation:vehicle_position`: `{ operationId, vehicle }`
+  - `vehicle:position`: `{ vehicleId, vehicle }`
+  - `operation:manifest_update`: `{ operationId, pax, checkedInCount }`
   - `operation:start`: `{ operationId, status: "active" }`
+  - `operation:warning`: `{ operationId, message }`
 
 ## Testing
 
@@ -71,15 +88,16 @@ npm test
 Acceptance checklist:
 - List operations for today/tomorrow: `GET /api/operations?date=YYYY-MM-DD`.
 - Start an operation: `POST /api/operations/:id/start` with guide/driver token.
-- Check-in pax: `POST /api/pax/:id/checkin` with guide token.
-- Vehicle heartbeat updates: `POST /api/vehicles/:id/heartbeat` with driver token and observe socket `vehicle:update`.
+- Check-in pax: `POST /api/pax/:id/checkin` with guide token and eventId (idempotent).
+- Vehicle heartbeat updates: `POST /api/vehicles/:id/heartbeat` with driver token and observe socket `operation:vehicle_position`.
+- Warning rule: after start_time+15m if checked-in ratio < 70%, socket emits `operation:warning`.
 
 ## Project layout
 
 - `src/app.ts` Express setup
 - `src/server.ts` HTTP + Socket.IO bootstrap
-- `src/models` Mongoose schemas (Operation, Pax, Vehicle, User)
-- `src/routes` Routers for operations, pax, vehicles, auth
+- `src/models` Mongoose schemas (Operation, Pax, Vehicle, User, Customer, Location, CheckInEvent, OperationAlert)
+- `src/routes` Routers for operations, pax, vehicles, customers, locations, auth
 - `src/services` Business logic
 - `src/sockets` Socket.IO init + emit helpers
 - `src/seed/seed.ts` Sample data loader

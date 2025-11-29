@@ -5,6 +5,8 @@ import { badRequest, notFound } from '../utils/httpErrors';
 interface HeartbeatPayload {
   location: { lat: number; lng: number };
   speed?: number;
+  heading?: number;
+  timestamp?: string;
 }
 
 export const recordHeartbeat = async (
@@ -18,7 +20,8 @@ export const recordHeartbeat = async (
   const ping = {
     location: payload.location,
     speed: payload.speed,
-    recordedAt: new Date()
+    heading: payload.heading,
+    recordedAt: payload.timestamp ? new Date(payload.timestamp) : new Date()
   };
 
   vehicle.lastPing = ping;

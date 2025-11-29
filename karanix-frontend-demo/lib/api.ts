@@ -8,9 +8,14 @@ export interface Stop {
 export interface Pax {
   _id: string;
   name: string;
-  seat?: string;
+  phone?: string;
+  seatNo?: string;
+  status: 'waiting' | 'checked_in' | 'no_show';
   checkedIn: boolean;
   checkInTime?: string;
+  pickupPoint?: { lat: number; lng: number; address?: string };
+  reservationId?: string;
+  notes?: string;
   operation: string;
 }
 
@@ -31,11 +36,19 @@ export interface Vehicle {
 
 export interface Operation {
   _id: string;
+  code: string;
+  tourName: string;
   title: string;
   date: string;
-  status: 'planned' | 'active' | 'completed';
+  startTime: string;
+  status: 'planned' | 'active' | 'completed' | 'cancelled';
+  driverId?: string;
+  guideId?: string;
+  totalPax: number;
+  checkedInCount: number;
   pax: Pax[];
   vehicles: Vehicle[];
+  route: { lat: number; lng: number }[];
   stops: Stop[];
   notes?: string;
 }

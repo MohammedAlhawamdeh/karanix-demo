@@ -6,6 +6,7 @@ export interface IPing {
     lng: number;
   };
   speed?: number;
+  heading?: number;
   recordedAt: Date;
 }
 
@@ -19,12 +20,13 @@ export interface IVehicle extends Document {
 
 const PingSchema = new Schema<IPing>(
   {
-    location: {
-      lat: { type: Number, required: true },
-      lng: { type: Number, required: true }
-    },
-    speed: { type: Number },
-    recordedAt: { type: Date, default: Date.now }
+  location: {
+    lat: { type: Number, required: true },
+    lng: { type: Number, required: true }
+  },
+  speed: { type: Number },
+  heading: { type: Number },
+  recordedAt: { type: Date, default: Date.now }
   },
   { _id: false }
 );

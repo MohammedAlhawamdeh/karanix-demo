@@ -16,11 +16,20 @@ export const ManifestList = ({ pax, guideToken, onUpdate }: Props) => {
 
   const checkIn = async (id: string) => {
     if (!guideToken) return;
+    const target = pax.find((p) => p._id === id);
+    const gps = target?.pickupPoint
+      ? { lat: target.pickupPoint.lat, lng: target.pickupPoint.lng }
+      : undefined;
     setLoadingId(id);
     try {
       const updated = await apiFetch<Pax>(`/api/pax/${id}/checkin`, {
         method: 'POST',
-        token: guideToken
+        token: guideToken,
+        body: JSON.stringify({
+          method: 'manual',
+          gps,
+          eventId: crypto.randomUUID()
+        })
       });
       onUpdate?.(updated);
     } finally {
@@ -50,8 +59,13 @@ export const ManifestList = ({ pax, guideToken, onUpdate }: Props) => {
             <div>
               <div style={{ fontWeight: 600 }}>{p.name}</div>
               <div className="muted" style={{ fontSize: 12 }}>
-                Seat {p.seat || '-'}
+                Seat {p.seatNo || '-'}
               </div>
+              {p.pickupPoint && (
+                <div className="muted" style={{ fontSize: 12 }}>
+                  Pickup: {p.pickupPoint.address || `${p.pickupPoint.lat}, ${p.pickupPoint.lng}`}
+                </div>
+              )}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span

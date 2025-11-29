@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import jwt from 'jsonwebtoken';
 import request from 'supertest';
+import { randomUUID } from 'crypto';
 import { Operation } from '../models/Operation';
 import { Pax } from '../models/Pax';
 import { Vehicle } from '../models/Vehicle';
@@ -28,16 +29,24 @@ describe('API endpoints', () => {
   beforeEach(async () => {
     await Promise.all([Operation.deleteMany({}), Pax.deleteMany({}), Vehicle.deleteMany({})]);
 
+    const start = new Date('2024-01-01T09:00:00Z');
     const operation = await Operation.create({
+      code: 'TEST-1',
+      tourName: 'Test Tour',
       title: 'Test Operation',
-      date: new Date('2024-01-01T09:00:00Z'),
+      date: start,
+      startTime: start,
       status: 'planned',
-      stops: []
+      totalPax: 1,
+      checkedInCount: 0,
+      stops: [],
+      route: [{ lat: 1, lng: 2 }]
     });
 
     const pax = await Pax.create({
       name: 'Test Pax',
-      seat: 'A1',
+      seatNo: 'A1',
+      pickupPoint: { lat: 1, lng: 2, address: 'Pickup' },
       operation: operation._id
     });
 
@@ -63,7 +72,10 @@ describe('API endpoints', () => {
   });
 
   it('lists operations filtered by date', async () => {
-    const res = await request(app).get('/api/operations').query({ date: '2024-01-01' });
+    const res = await request(app)
+      .get('/api/operations')
+      .set('Authorization', `Bearer ${makeToken('guide')}`)
+      .query({ date: '2024-01-01' });
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(1);
     expect(res.body[0].title).toBe('Test Operation');
@@ -82,7 +94,12 @@ describe('API endpoints', () => {
     const token = makeToken('guide');
     const res = await request(app)
       .post(`/api/pax/${paxId}/checkin`)
-      .set('Authorization', `Bearer ${token}`);
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        method: 'manual',
+        gps: { lat: 1, lng: 2 },
+        eventId: randomUUID()
+      });
     expect(res.status).toBe(200);
     expect(res.body.checkedIn).toBe(true);
   });
@@ -92,7 +109,12 @@ describe('API endpoints', () => {
     const res = await request(app)
       .post(`/api/vehicles/${vehicleId}/heartbeat`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ location: { lat: 1, lng: 2 }, speed: 25 });
+      .send({
+        location: { lat: 1, lng: 2 },
+        speed: 25,
+        heading: 90,
+        timestamp: new Date().toISOString()
+      });
     expect(res.status).toBe(200);
     expect(res.body.lastPing.location.lat).toBe(1);
     expect(res.body.lastPing.location.lng).toBe(2);

@@ -18,12 +18,12 @@ Environment:
 
 ## Features
 
-- Today/Tomorrow operations list with manifest progress.
+- Today/Tomorrow operations table (auth-backed) with manifest progress.
 - Operation detail page:
-  - Pax manifest with check-in buttons (guide token).
-  - Live map with vehicle markers (last ping) and pickup stops.
+  - Pax manifest with idempotent check-in buttons (sends `method/gps/eventId`).
+  - Live map with pax pickup markers, stops, vehicle markers, and route polyline.
   - Start operation action.
-  - WebSocket listeners for `vehicle:update`, `manifest:update`, `operation:start`.
+  - WebSocket listeners for `operation:vehicle_position`, `operation:manifest_update`, `operation:start`, `operation:warning`.
 - AuthProvider auto-logins with seed users for convenience.
 
 ## How to test against backend
@@ -36,8 +36,8 @@ Environment:
    - Click into an operation.
 5) In the detail page:
    - Press **Start operation** to hit `POST /api/operations/:id/start`.
-   - Click **Check-in** on a passenger to call `/api/pax/:id/checkin`; manifest list updates via socket.
-   - Vehicle markers update on `vehicle:update` (send heartbeat via backend API or driver client).
+   - Click **Check-in** on a passenger to call `/api/pax/:id/checkin` (sends GPS + eventId); manifest list updates via socket.
+   - Vehicle markers update on `operation:vehicle_position` (send heartbeat via backend API or driver client).
 
 ## Project layout
 

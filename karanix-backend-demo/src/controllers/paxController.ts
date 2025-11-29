@@ -4,10 +4,11 @@ import { emitManifestUpdate } from '../sockets/events';
 
 export const checkInHandler = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const pax = await checkInPax(req.params.id);
-    const opId = (pax.operation as any as { id: string }).id || pax.operation.toString();
-    emitManifestUpdate(opId, pax);
-    res.json(pax);
+    const result = await checkInPax(req.params.id, req.body);
+    const opId =
+      (result.doc.operation as any as { id: string }).id || result.doc.operation.toString();
+    emitManifestUpdate(opId, result.doc, result.checkedInCount);
+    res.json(result.doc);
   } catch (err) {
     next(err);
   }

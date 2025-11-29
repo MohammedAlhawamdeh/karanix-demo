@@ -6,6 +6,8 @@ import { operationsRouter } from './routes/operations';
 import { vehiclesRouter } from './routes/vehicles';
 import { paxRouter } from './routes/pax';
 import { authRouter } from './routes/auth';
+import { customersRouter } from './routes/customers';
+import { locationsRouter } from './routes/locations';
 import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
@@ -24,6 +26,8 @@ app.use('/api/operations', operationsRouter);
 app.use('/api/vehicles', vehiclesRouter);
 app.use('/api/pax', paxRouter);
 app.use('/api/auth', authRouter);
+app.use('/api/customers', customersRouter);
+app.use('/api/locations', locationsRouter);
 
 app.use(errorHandler);
 

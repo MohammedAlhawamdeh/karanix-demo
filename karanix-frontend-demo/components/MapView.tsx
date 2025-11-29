@@ -1,12 +1,13 @@
 'use client';
 /* global google */
-import { GoogleMap, MarkerF, useLoadScript } from '@react-google-maps/api';
+import { GoogleMap, MarkerF, PolylineF, useLoadScript } from '@react-google-maps/api';
 import React from 'react';
-import { Operation, Vehicle } from '../lib/api';
+import { Operation, Pax, Vehicle } from '../lib/api';
 
 interface Props {
   operation?: Operation;
   vehicles: Vehicle[];
+  pax?: Pax[];
 }
 
 const containerStyle = {
@@ -17,7 +18,7 @@ const containerStyle = {
   border: '1px solid var(--border)'
 };
 
-export const MapView = ({ operation, vehicles }: Props) => {
+export const MapView = ({ operation, vehicles, pax }: Props) => {
   const mapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const { isLoaded } = useLoadScript({
     googleMapsApiKey: mapsKey || ''
@@ -45,11 +46,13 @@ export const MapView = ({ operation, vehicles }: Props) => {
     );
   }
 
+  const paxPoints = pax || operation.pax || [];
   const primaryVehicle = vehicles.find((v) => v.lastPing?.location);
   const primaryStop = operation.stops[0];
   const center =
     primaryVehicle?.lastPing?.location ||
-    primaryStop?.location || { lat: 40.75, lng: -73.98 };
+    primaryStop?.location ||
+    paxPoints.find((p) => p.pickupPoint)?.pickupPoint || { lat: 40.75, lng: -73.98 };
 
   return (
     <div className="card">
@@ -60,12 +63,27 @@ export const MapView = ({ operation, vehicles }: Props) => {
         </div>
       </div>
       <div style={{ marginTop: 10 }}>
-        <GoogleMap mapContainerStyle={containerStyle} center={center} zoom={12} options={{ styles: [{ featureType: 'poi', stylers: [{ visibility: 'off' }] }] }}>
+        <GoogleMap
+          mapContainerStyle={containerStyle}
+          center={center}
+          zoom={12}
+          options={{ styles: [{ featureType: 'poi', stylers: [{ visibility: 'off' }] }] }}
+        >
+          {operation.route?.length > 1 && (
+            <PolylineF
+              path={operation.route}
+              options={{
+                strokeColor: '#22d3ee',
+                strokeWeight: 4,
+                strokeOpacity: 0.7
+              }}
+            />
+          )}
           {operation.stops.map((stop) => (
             <MarkerF
               key={stop.name}
               position={stop.location}
-              label={{ text: 'P', color: '#0b1324', fontWeight: '700' }}
+              label={{ text: 'S', color: '#0b1324', fontWeight: '700' }}
               icon={{
                 path: google.maps.SymbolPath.CIRCLE,
                 scale: 10,
@@ -76,6 +94,23 @@ export const MapView = ({ operation, vehicles }: Props) => {
               }}
             />
           ))}
+          {paxPoints
+            .filter((p) => p.pickupPoint)
+            .map((p) => (
+              <MarkerF
+                key={p._id}
+                position={p.pickupPoint!}
+                label={{ text: 'P', color: '#0b1324', fontWeight: '700' }}
+                icon={{
+                  path: google.maps.SymbolPath.CIRCLE,
+                  scale: 7,
+                  fillColor: '#f97316',
+                  fillOpacity: 0.9,
+                  strokeColor: '#0b1324',
+                  strokeWeight: 2
+                }}
+              />
+            ))}
           {vehicles
             .filter((v) => v.lastPing?.location)
             .map((vehicle) => (
